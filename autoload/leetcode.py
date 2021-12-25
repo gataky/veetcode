@@ -5,6 +5,7 @@ import string
 import textwrap
 from collections import defaultdict
 
+from tabulate import tabulate
 import browser_cookie3
 import pynvim
 import requests
@@ -80,6 +81,18 @@ class LeetCode(Session):
             elif category == 'topics':
                 t = TopicTags(tags)
         return (c, t)
+
+    def get_problem(self, slug):
+        query = {
+            "operationName":"questionData",
+            "variables":{"titleSlug":slug},
+            "query":"query questionData($titleSlug: String\u0021) {question(titleSlug: $titleSlug) { questionId questionFrontendId boundTopicId title titleSlug content translatedTitle translatedContent isPaidOnly difficulty likes dislikes isLiked similarQuestions exampleTestcases contributors { username profileUrl avatarUrl __typename } topicTags { name slug translatedName __typename } codeSnippets { lang langSlug code __typename } stats hints solution { id canSeeDetail paidOnly hasVideoSolution paidOnlyVideo __typename } status sampleTestCase metaData judgerAvailable judgeType mysqlSchemas enableRunCode enableTestMode enableDebugger challengeQuestion { id date incompleteChallengeCount streakCount type __typename } __typename }}"
+        }
+        url = LC_BASE + "/graphql"
+        resp = self.post(url, json=query)
+        return resp
+
+
 
 
 class Base(list):
@@ -183,23 +196,50 @@ class Tag:
             self.id, self.name, self.slug
         )
 
+
+
+sort_symbol = {
+    0: '▲',
+    1: '‒',
+    2: '▼',
+}
+
+symbols = {
+    1: '-',
+    2: '☓',
+    3: '✓'
+}
+
+levels = {
+    1: 'Easy',
+    2: 'Medium',
+    3: 'Hard'
+}
+
+
+con = None
+cur = None
 cwd = '~/'
-def set_cwd(path):
-    global cwd
+def set_script_directory(path):
+    global cwd, cur, con
     cwd = path
+    con = sqlite3.connect(os.path.join(cwd, "foo.db"))
+    cur = con.cursor()
 
+problem_dir = '~/.local/share/veetcode'
+def set_problem_directory(path):
+    path = os.path.expanduser(path)
+    if os.path.exists(path) == False:
+        os.mkdir(path)
+    global problem_dir
+    problem_dir = path
 
-def get_conn():
-    return sqlite3.connect(os.path.join(cwd, "foo.db"))
 
 
 def initialize_db():
     lc = LeetCode()
     companies, tags = lc.get_tags()
     problems = lc.get_problems()
-
-    con = get_conn()
-    cur = con.cursor()
 
     NOOP = "ON CONFLICT DO NOTHING"
 
@@ -241,9 +281,6 @@ def get_tags(tag_type, tag=""):
 
     tag = tag.strip('+').lower().strip()
     tag_type = tag_type.lower()
-
-    con = get_conn()
-    cur = con.cursor()
 
     if tag:
         query = f"UPDATE {tag_type} SET active = not active WHERE slug = ?"
@@ -290,16 +327,6 @@ def get_tags(tag_type, tag=""):
 
 def get_problems(orders=None):
 
-    con = get_conn()
-    cur = con.cursor()
-
-    filters = {
-        'companies': None,
-        'tags': None,
-        'difficulty': None,
-        'status': None
-    }
-
     order_by = []
     column = ['p.difficulty_id', 'p.status_id', 'p.id', 'p.name', 'p.frequency']
     for i, order in enumerate(orders):
@@ -317,6 +344,12 @@ def get_problems(orders=None):
     if order_by:
         order_by = 'ORDER BY ' + order_by
 
+    filters = {
+        'companies': None,
+        'tags': None,
+        'difficulty': None,
+        'status': None
+    }
 
     for filter in filters.keys():
         query = "SELECT id FROM {table} WHERE active IS TRUE".format(table=filter)
@@ -350,26 +383,13 @@ def get_problems(orders=None):
     """.format(order_by=order_by, **filters)
 
     resp = cur.execute(query)
+
     problems = []
-    symbols = {
-        1: '-',
-        2: '☓',
-        3: '✓'
-    }
-    levels = {
-        1: 'Easy',
-        2: 'Medium',
-        3: 'Hard'
-    }
     for problem in resp.fetchall():
-        # problems.append(" ".join(list(map(str, problem))))
         problem = list(problem)
         problem[0] = levels[problem[0]]
         problem[1] = symbols[problem[1]]
-        problem[3] = problem[3] if len(problem[3]) < 41 else problem[3][:41] + '...'
-        problem.append("")
-        problems.append("│ {:6} │    {}    │ {:4}│ {:44} │{:14}│".format(*problem))
-    problems.append("╘════════╧═════════╧═════╧══════════════════════════════════════════════╧══════════════╛")
+        problems.append(problem)
     return problems
 
 def setup_filters():
@@ -381,39 +401,48 @@ def setup_filters():
     return output
 
 def setup_problems():
-
-    con = get_conn()
-    cur = con.cursor()
-
     query = "SELECT * FROM ordering"
     resp = cur.execute(query)
     ordering = resp.fetchone()
 
-    sort_symbol = {
-        0: '▲',
-        1: '‒',
-        2: '▼',
-    }
-
     ordering_symbols = [sort_symbol[order] for order in ordering]
+    headers = ['Level', 'Status', 'ID ', 'Title', 'Frequency']
+    headers = [s+h for s, h in zip(ordering_symbols, headers)]
 
-    output = [
-        "Problems",
-        "╒════════╤═════════╤═════╤══════════════════════════════════════════════╤══════════════╕",
-        "│ {}Level │ {}Status │ {}ID │ {}Title                                       │ {}Frequency   │".format(*ordering_symbols),
-    ]
-    output.extend(get_problems(ordering))
+    problems = get_problems(ordering)
+    table = tabulate(problems, headers, tablefmt="fancy_outline", as_array=True, colalign=("center", "center"))
+    output = ["Problems"]
+    output.extend(table)
     return output
 
 
 def toggle_order(header):
-    con = get_conn()
-    cur = con.cursor()
-
     query = f"UPDATE ordering SET {header} = ({header} + 1) % 3"
     cur.execute(query)
     con.commit()
 
-if __name__ == "__main__":
-    cwd = "."
 
+def get_problem(id):
+
+    if os.path.exists(os.path.join(problem_dir, str(id))):
+        exists = os.path.exists(f"{id}.py")
+
+    query = "SELECT slug FROM problems WHERE id = ?"
+    resp = cur.execute(query, (id,))
+    slug = resp.fetchone()[0]
+
+    lc = LeetCode()
+    resp = lc.get_problem(slug)
+
+    data = resp.json()
+    question = data['data']['question']
+    prompt = question['content'].split("\n")
+
+    snippets = question['codeSnippets']
+    snippet = list(filter(lambda x: x['langSlug']=='python3', snippets))[0]['code'].split("\n")
+
+    return {'snippet': snippet, 'prompt': prompt}
+
+
+if __name__ == "__main__":
+    set_script_directory('.')

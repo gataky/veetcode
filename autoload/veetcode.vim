@@ -1,17 +1,20 @@
 let s:current_dir = expand("<sfile>:p:h")
 
+
 python3 <<PYTHON_EOF
 import os
 import vim
 
 plugin_dir = vim.eval('s:current_dir')
+problem_dir = vim.eval('g:veetcode_problem_directory')
 
 if plugin_dir not in sys.path:
   sys.path.append(plugin_dir)
 
 import leetcode
 
-leetcode.set_cwd(plugin_dir)
+leetcode.set_script_directory(plugin_dir)
+leetcode.set_problem_directory(problem_dir)
 PYTHON_EOF
 
 
@@ -51,9 +54,9 @@ function! s:DisplayProblems(state) abort
 endfunction
 
 function! s:SetupHighlighting() abort
-    syn match lcEasy   /│ Easy /hs=s+2
-    syn match lcMedium /│ Medium /hs=s+2
-    syn match lcHard   /│ Hard /hs=s+2
+    syn match lcEasy   /│\s\+Easy/hs=s+2
+    syn match lcMedium /│\s\+Medium/hs=s+2
+    syn match lcHard   /│\s\+Hard/hs=s+2
 
     syn match lcTodo       /│\s*-\s*│/hs=s+1,he=e-1
     syn match lcIncomplete /│\s*☓\s*│/hs=s+1,he=e-1
@@ -145,7 +148,6 @@ function! s:UpdateFilters(tag) abort
     call append(filter_position[1], tags)
 
     call setpos('.', pos)
-
 endfunction
 
 function! s:HandleProblems() abort
@@ -197,6 +199,37 @@ endfunction
 
 
 function! s:HandleProblem() abort
-    echom "Opening the problem"
+
+    execute 'normal! 02f│lvt│y'
+    let id = trim(getreg('"'))
+    let problem = py3eval('leetcode.get_problem('.id.')')
+
+    let problem_dir = expand(g:veetcode_problem_directory . '/' . id . '/')
+    let prompt_filename = problem_dir . 'prompt.md'
+    let code_filename   = problem_dir . 'code.py'
+    let test_filename   = problem_dir . 'test.py'
+
+    if filewritable(prompt_filename)
+        execute 'edit ' . prompt_filename
+    else
+        execute 'enew'
+        call append(0, problem['prompt'])
+        execute 'w '.prompt_filename
+    endif
+
+    if filewritable(code_filename)
+        execute 'botright vsplit '.code_filename
+    else
+        execute 'botright vsplit '.code_filename
+        call append(0, problem['snippet'])
+        execute 'w '.code_filename
+    endif
+
+    if filewritable(test_filename)
+        execute 'rightbelow split '.test_filename
+    else
+        execute 'rightbelow split '.test_filename
+        execute 'w '.test_filename
+    endif
 endfunction
 
