@@ -28,6 +28,7 @@ CREATE TABLE problems (
     status_id INTEGER NOT NULL,
     paid BOOLEAN DEFAULT FALSE,
     frequency REAL,
+    downloaded BOOLEAN DEFAULT FALSE,
     submitted BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (difficulty_id) REFERENCES difficulty (id),
     FOREIGN KEY (status_id)     REFERENCES status     (id)

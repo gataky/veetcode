@@ -1,6 +1,5 @@
 let s:current_dir = expand("<sfile>:p:h")
 
-
 python3 <<PYTHON_EOF
 import os
 import vim
@@ -16,7 +15,6 @@ import leetcode
 leetcode.set_script_directory(plugin_dir)
 leetcode.set_problem_directory(problem_dir)
 PYTHON_EOF
-
 
 
 function! veetcode#SetupProblemListBuffer() abort
@@ -36,10 +34,12 @@ function! veetcode#SetupProblemListBuffer() abort
     call s:DisplayProblems("initial")
 endfunction
 
+
 function! s:DisplayFilters() abort
     let filters = py3eval('leetcode.setup_filters()')
     call append('.', filters)
 endfunction
+
 
 function! s:DisplayProblems(state) abort
     let problems = py3eval('leetcode.setup_problems()')
@@ -52,6 +52,7 @@ function! s:DisplayProblems(state) abort
         call append('.', problems)
     endif
 endfunction
+
 
 function! s:SetupHighlighting() abort
     syn match lcEasy   /│\s\+Easy/hs=s+2
@@ -150,12 +151,13 @@ function! s:UpdateFilters(tag) abort
     call setpos('.', pos)
 endfunction
 
+
 function! s:HandleProblems() abort
     let row_type = s:GetRowType()
     if row_type ==? 'header'
         call s:HandleHeader()
     elseif row_type ==? 'problem'
-        call s:HandleProblem()
+        call s:GetProblem("display")
     endif
 endfunction
 
@@ -174,6 +176,7 @@ function! s:GetRowType() abort
         return 'problem'
     endif
 endfunction
+
 
 " HandleHeader handles the header row of the problems table.  When a column
 " header is selected, the sorting order will change for that column.
@@ -198,27 +201,36 @@ function! s:HandleHeader() abort
 endfunction
 
 
-function! s:HandleProblem() abort
+function! s:GetProblem(get_for) abort
 
     execute 'normal! 02f│lvt│y'
     let id = trim(getreg('"'))
     let problem = py3eval('leetcode.get_problem('.id.')')
 
-    let problem_dir = expand(g:veetcode_problem_directory . '/' . id . '/')
-    let prompt_filename = problem_dir . 'prompt.md'
-    let code_filename   = problem_dir . 'code.py'
-    let test_filename   = problem_dir . 'test.py'
+    let problem_dir = expand(g:veetcode_problem_directory.'/'.id.'/')
+    let prompt_filename = problem_dir.'prompt.md'
+    let code_filename   = problem_dir.'code.py'
+    let test_filename   = problem_dir.'test.py'
+
+    execute 'tabnew'
+
+    execute 'cd '.problem_dir
 
     if filewritable(prompt_filename)
         execute 'edit ' . prompt_filename
+    elseif a:get_for ==? "download"
+        :
     else
         execute 'enew'
         call append(0, problem['prompt'])
         execute 'w '.prompt_filename
     endif
+    execute 'setlocal wrap'
 
     if filewritable(code_filename)
         execute 'botright vsplit '.code_filename
+    elseif a:get_for ==? "download"
+        :
     else
         execute 'botright vsplit '.code_filename
         call append(0, problem['snippet'])
@@ -227,9 +239,16 @@ function! s:HandleProblem() abort
 
     if filewritable(test_filename)
         execute 'rightbelow split '.test_filename
+    elseif a:get_for ==? "download"
+        :
     else
         execute 'rightbelow split '.test_filename
         execute 'w '.test_filename
     endif
+
+    call py3eval('leetcode.set_problem_downloaded('.id.')')
 endfunction
 
+function! veetcode#DownloadProblems() range
+    echom a:firstline
+endfunction

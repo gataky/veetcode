@@ -1,3 +1,4 @@
+import re
 import json
 import os
 import sqlite3
@@ -10,18 +11,6 @@ import browser_cookie3
 import pynvim
 import requests
 from requests import Session, adapters
-
-categories = {
-    "all",
-    "algorithms",
-    "database",
-    "shell",
-    "concurrency",
-}
-
-category_tags = {
-    'dynamic-programming',
-}
 
 LC_BASE = "https://leetcode.com"
 
@@ -137,6 +126,9 @@ class Problem:
     def __init__(self, stat, status, difficulty, paid_only, frequency, **kwargs):
         self.id = stat.get('question_id')
         self.slug = stat.get('question__article__slug')
+        if self.slug is None:
+            self.slug = self._parse_title(stat.get("question__title"))
+
         self.difficulty_id = difficulty['level']
         self.status_id = self.status_map.get(status)
 
@@ -149,6 +141,11 @@ class Problem:
 
     def __repr__(self):
         return f"""{self.status_id} {self.difficulty_id} {self.id:04}: {self.stat.get("question__title")}"""
+
+    def _parse_title(self, title):
+        clean = re.sub('\s', '-', title)
+        clean = re.sub('[^a-zA-Z0-9_-]', '', clean)
+        return clean.lower()
 
     def row(self):
         return (
@@ -424,8 +421,9 @@ def toggle_order(header):
 
 def get_problem(id):
 
-    if os.path.exists(os.path.join(problem_dir, str(id))):
-        exists = os.path.exists(f"{id}.py")
+    dir = os.path.join(problem_dir, str(id))
+    if not os.path.exists(dir):
+        os.mkdir(dir)
 
     query = "SELECT slug FROM problems WHERE id = ?"
     resp = cur.execute(query, (id,))
@@ -443,6 +441,13 @@ def get_problem(id):
 
     return {'snippet': snippet, 'prompt': prompt}
 
+def set_problem_downloaded(id):
+
+    query = "UPDATE problems SET downloaded = TRUE WHERE id = ?"
+    cur.execute(query, (id,))
+    con.commit()
+
 
 if __name__ == "__main__":
     set_script_directory('.')
+    set_problem_directory(problem_dir)
