@@ -304,8 +304,8 @@ def get_tags(tag_type, tag=""):
                     width=86,
                     break_long_words=False,
                     break_on_hyphens=False,
-                    initial_indent=" " * 6,
-                    subsequent_indent=" " * 7,
+                    initial_indent=" " * 7,
+                    subsequent_indent=" " * 8,
                 )
             )
     return tags

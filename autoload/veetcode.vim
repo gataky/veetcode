@@ -20,6 +20,7 @@ PYTHON_EOF
 function! veetcode#SetupProblemListBuffer() abort
     setlocal buftype=nofile
     setlocal foldmethod=indent
+    setlocal foldlevel=1
     setlocal noswapfile
     setlocal nobackup
     setlocal nonumber
@@ -222,6 +223,7 @@ function! s:GetProblem(lineno, get_for) abort
 endfunction
 
 function! s:GetProblemForDownload(id)
+    echom "downloading ".a:id
     call py3eval('leetcode.get_problem('.a:id.', get_for="download")')
 endfunction
 
