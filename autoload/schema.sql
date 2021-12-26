@@ -83,10 +83,10 @@ CREATE TABLE attempts (
 
 
 CREATE TABLE ordering (
-    level     INTEGER DEFAULT FALSE,
-    status    INTEGER DEFAULT FALSE,
-    id        INTEGER DEFAULT FALSE,
-    title     INTEGER DEFAULT FALSE,
-    frequency INTEGER DEFAULT FALSE
+    level     INTEGER DEFAULT 1,
+    status    INTEGER DEFAULT 1,
+    id        INTEGER DEFAULT 1,
+    title     INTEGER DEFAULT 1,
+    frequency INTEGER DEFAULT 1
 );
-INSERT INTO ordering VALUES (FALSE, FALSE, FALSE, FALSE, FALSE);
+INSERT INTO ordering VALUES (1, 1, 1, 1, 1);

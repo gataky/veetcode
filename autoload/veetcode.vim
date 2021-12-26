@@ -27,7 +27,12 @@ function! veetcode#SetupProblemListBuffer() abort
     setlocal nospell
     setlocal bufhidden=hide
     setlocal nowrap
-    nnoremap <silent> <buffer> <return> :call <SID>HandleCR()<cr>
+    command! -range   VeetCodeHandleCRv <line1>;<line2> call s:HandleCR()
+    command! -nargs=0 VeetCodeHandleCRn                 call s:HandleCR()
+
+    vnoremap <silent> <buffer> <return> :VeetCodeHandleCRv<cr>
+    nnoremap <silent> <buffer> <return> :VeetCodeHandleCRn<cr>
+
 
     call s:SetupHighlighting()
     call s:DisplayFilters()
@@ -81,12 +86,12 @@ function! s:SetupHighlighting() abort
 endfunction
 
 
-function! s:HandleCR() abort
+function! s:HandleCR() range
     let section = s:GetSection()
     if section ==? 'filters'
         call s:HandleFilters(section)
     elseif section ==? 'problems'
-        call s:HandleProblems()
+        call s:HandleProblems(a:firstline, a:lastline)
     endif
 endfunction
 
@@ -152,27 +157,30 @@ function! s:UpdateFilters(tag) abort
 endfunction
 
 
-function! s:HandleProblems() abort
-    let row_type = s:GetRowType()
+function! s:HandleProblems(start, end) abort
+    let row_type = s:GetRowType(a:start)
     if row_type ==? 'header'
         call s:HandleHeader()
     elseif row_type ==? 'problem'
-        call s:GetProblem("display")
+        if a:start != a:end
+            for lineno in range(a:start, a:end)
+                call s:GetProblem(lineno, "download")
+            endfor
+        else
+            call s:GetProblem(a:firstline, "display")
+        endif
     endif
 endfunction
 
 
 " GetRowType will check which type of row we're interacting with (header or
 " problem) based on the upper left char type of that row.
-function! s:GetRowType() abort
-    let pos = getpos('.')
-    execute 'normal! 0kvy'
-    let char = getreg('"')
-    call setpos('.', pos)
-
-    if char ==# '╒'
+function! s:GetRowType(lineno) abort
+    let line = getline(a:lineno)
+    let fields = split(line, '│')
+    if len(fields) >= 4 && fields[0] =~? 'level'
         return 'header'
-    else
+    elseif len(fields) >= 4 && fields[0] =~? '\(easy\|medium\|hard\)'
         return 'problem'
     endif
 endfunction
@@ -201,25 +209,36 @@ function! s:HandleHeader() abort
 endfunction
 
 
-function! s:GetProblem(get_for) abort
+function! s:GetProblem(lineno, get_for) abort
+    let line = getline(a:lineno)
+    let fields = split(line, '│')
+    let id = str2nr(fields[2], 10)
 
-    execute 'normal! 02f│lvt│y'
-    let id = trim(getreg('"'))
-    let problem = py3eval('leetcode.get_problem('.id.')')
+    if a:get_for ==? "display"
+        call s:GetProblemForDisplay(id)
+    else
+        call s:GetProblemForDownload(id)
+    endif
+endfunction
 
-    let problem_dir = expand(g:veetcode_problem_directory.'/'.id.'/')
-    let prompt_filename = problem_dir.'prompt.md'
-    let code_filename   = problem_dir.'code.py'
-    let test_filename   = problem_dir.'test.py'
+function! s:GetProblemForDownload(id)
+    call py3eval('leetcode.get_problem('.a:id.', get_for="download")')
+endfunction
 
-    execute 'tabnew'
+function! s:GetProblemForDisplay(id)
+    let problem = py3eval('leetcode.get_problem('.a:id.')')
+
+    let problem_dir = expand(g:veetcode_problem_directory.'/'.a:id.'/')
 
     execute 'cd '.problem_dir
 
+    let prompt_filename = problem_dir.'prompt.md'
+    let code_filename   = problem_dir.'code.py'
+    let test_filename   = problem_dir.'test.py'
+    execute 'tabnew'
+
     if filewritable(prompt_filename)
         execute 'edit ' . prompt_filename
-    elseif a:get_for ==? "download"
-        :
     else
         execute 'enew'
         call append(0, problem['prompt'])
@@ -229,8 +248,6 @@ function! s:GetProblem(get_for) abort
 
     if filewritable(code_filename)
         execute 'botright vsplit '.code_filename
-    elseif a:get_for ==? "download"
-        :
     else
         execute 'botright vsplit '.code_filename
         call append(0, problem['snippet'])
@@ -239,16 +256,10 @@ function! s:GetProblem(get_for) abort
 
     if filewritable(test_filename)
         execute 'rightbelow split '.test_filename
-    elseif a:get_for ==? "download"
-        :
     else
         execute 'rightbelow split '.test_filename
         execute 'w '.test_filename
     endif
-
-    call py3eval('leetcode.set_problem_downloaded('.id.')')
+    call py3eval('leetcode.set_problem_downloaded('.a:id.')')
 endfunction
 
-function! veetcode#DownloadProblems() range
-    echom a:firstline
-endfunction

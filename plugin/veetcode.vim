@@ -4,5 +4,5 @@ if !exists('g:veetcode_problem_directory')
     let g:veetcode_problem_directory = '~/.local/share/veetcode'
 endif
 
-command! -nargs=0 VeetCodeList                 call veetcode#SetupProblemListBuffer()
-command! -range   Foo          <line1> call veetcode#DownloadProblems()
+command! -nargs=0 VeetCodeList call veetcode#SetupProblemListBuffer()
+
