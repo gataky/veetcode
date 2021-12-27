@@ -1,3 +1,4 @@
+import time
 import json
 import os
 import re
@@ -38,6 +39,7 @@ class Auth:
             "X-Requested-With": "XMLHttpRequest",
             "X-CSRFToken": self.session.cookies.get("csrftoken", ""),
         }
+        headers.update(request.headers)
         request.headers.update(headers)
         return request
 
@@ -78,6 +80,28 @@ class LeetCode(Session):
         url = LC_BASE + "/graphql"
         resp = self.post(url, json=query)
         return resp
+
+    def submit_problem(self, id, slug, code):
+        url = LC_BASE + f"/problems/{slug}/submit/"
+
+        data = {
+            'question_id': id,
+            'lang': 'python3',
+            'typed_code': code
+        }
+
+        r = self.get(LC_BASE)
+        csrf = r.headers['Set-Cookie'].split(';')[0].split('=')[1]
+
+        resp = self.post(url, json=data, headers={'csrftoken': csrf})
+
+        sid = resp.json().get('submission_id')
+        url = LC_BASE + f"/submissions/detail/{sid}/check/"
+        for x in range(5):
+            resp = self.get(url)
+            if resp.json().get('state') == 'SUCCESS':
+                return resp
+            time.sleep(2)
 
 
 class Base(list):
@@ -457,7 +481,32 @@ def set_problem_downloaded(id):
     cur.execute(query, (id,))
     con.commit()
 
+def submit_problem(id):
+
+    query = "SELECT slug FROM problems WHERE id = ?"
+    resp = cur.execute(query, (id,))
+    slug = resp.fetchone()[0]
+
+    lc = LeetCode()
+
+    with open(os.path.join(problem_dir, str(id), 'code.py'), 'rb') as f:
+        code = f.read().decode('utf-8')
+    resp = lc.submit_problem(id, slug, code)
+    return resp.json().get('status_msg')
+
+
 
 if __name__ == "__main__":
     set_script_directory(".")
     set_problem_directory(problem_dir)
+
+    # lc = LeetCode()
+    # code = """class Solution:
+    # def twoSum(self, nums: List[int], target: int) -> List[int]:
+    #     m = {}
+    #     for i, n in enumerate(nums):
+    #         m[target - n] = i
+    #     for i, n in enumerate(nums):
+    #         if n in m and m[n] != i:
+    #             return i, m[n]"""
+    # resp = lc.submit_problem(1, 'two-sum', code)

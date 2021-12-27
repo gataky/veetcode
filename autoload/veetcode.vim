@@ -28,11 +28,17 @@ function! veetcode#SetupProblemListBuffer() abort
     setlocal nospell
     setlocal bufhidden=hide
     setlocal nowrap
+
     command! -range   VeetCodeHandleCRv <line1>;<line2> call s:HandleCR()
     command! -nargs=0 VeetCodeHandleCRn                 call s:HandleCR()
+    command! -nargs=0 VeetCodeSubmit                    call s:SubmitProblem()
+    command! -nargs=0 VeetCodeOpenPromptInBrowser       call s:OpenPromptInBrowser()
 
     vnoremap <silent> <buffer> <return> :VeetCodeHandleCRv<cr>
     nnoremap <silent> <buffer> <return> :VeetCodeHandleCRn<cr>
+    nnoremap <silent> <leader>vs        :VeetCodeSubmit<cr>
+    nnoremap <silent> <leader>vp        :VeetCodeOpenPromptInBrowser<cr>
+
 
 
     call s:SetupHighlighting()
@@ -265,3 +271,13 @@ function! s:GetProblemForDisplay(id)
     call py3eval('leetcode.set_problem_downloaded('.a:id.')')
 endfunction
 
+function! s:SubmitProblem() abort
+    let id = split(expand('%:h'), '/')[-1]
+    echom py3eval('leetcode.submit_problem('.id.')')
+endfunction
+
+function! s:OpenPromptInBrowser() abort
+    let id = split(expand('%:h'), '/')[-1]
+    let problem_dir = expand(g:veetcode_problem_directory.'/'.id.'/')
+    execute "!google-chrome " . problem_dir . 'prompt.md'
+endfunction
