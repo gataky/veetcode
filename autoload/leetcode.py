@@ -16,6 +16,15 @@ from tabulate import tabulate
 LC_BASE = "https://leetcode.com"
 
 
+def ErrorHandler(func):
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as err:
+            return None
+    return wrapper
+
+
 class CookiesNotFoundException(Exception):
     def __init__(self, browser):
         super().__init__(f"Cookies not found, please login through {browser}")
@@ -245,6 +254,7 @@ def set_problem_directory(path):
     problem_dir = path
 
 
+@ErrorHandler
 def initialize_db():
     lc = LeetCode()
     companies, tags = lc.get_tags()
@@ -286,6 +296,7 @@ def initialize_db():
     con.close()
 
 
+@ErrorHandler
 def get_tags(tag_type, tag=""):
 
     tag = tag.strip("+").lower().strip()
@@ -335,6 +346,7 @@ def get_tags(tag_type, tag=""):
     return tags
 
 
+@ErrorHandler
 def get_problems(orders=None):
 
     order_by = []
@@ -437,11 +449,21 @@ def toggle_order(header):
     con.commit()
 
 
+@ErrorHandler
 def get_problem(id, get_for="display"):
 
     dir = os.path.join(problem_dir, str(id))
     if not os.path.exists(dir):
         os.mkdir(dir)
+    elif os.path.exists(dir) and get_for == 'display':
+        resp = {}
+        with open(os.path.join(dir, 'code.py'), 'rb') as f:
+            resp['snippet'] = f.read().decode('utf-8')
+        with open(os.path.join(dir, 'prompt.md'), 'rb') as f:
+            resp['prompt'] = f.read().decode('utf-8')
+        with open(os.path.join(dir, 'test.py'), 'rb') as f:
+            resp['test'] = f.read().decode('utf-8')
+        return resp
 
     query = "SELECT slug FROM problems WHERE id = ?"
     resp = cur.execute(query, (id,))
@@ -476,13 +498,13 @@ def get_problem(id, get_for="display"):
 
 
 def set_problem_downloaded(id):
-
     query = "UPDATE problems SET downloaded = TRUE WHERE id = ?"
     cur.execute(query, (id,))
     con.commit()
 
-def submit_problem(id):
 
+@ErrorHandler
+def submit_problem(id):
     query = "SELECT slug FROM problems WHERE id = ?"
     resp = cur.execute(query, (id,))
     slug = resp.fetchone()[0]
@@ -499,14 +521,3 @@ def submit_problem(id):
 if __name__ == "__main__":
     set_script_directory(".")
     set_problem_directory(problem_dir)
-
-    # lc = LeetCode()
-    # code = """class Solution:
-    # def twoSum(self, nums: List[int], target: int) -> List[int]:
-    #     m = {}
-    #     for i, n in enumerate(nums):
-    #         m[target - n] = i
-    #     for i, n in enumerate(nums):
-    #         if n in m and m[n] != i:
-    #             return i, m[n]"""
-    # resp = lc.submit_problem(1, 'two-sum', code)

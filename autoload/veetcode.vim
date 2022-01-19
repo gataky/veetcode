@@ -33,12 +33,13 @@ function! veetcode#SetupProblemListBuffer() abort
     command! -nargs=0 VeetCodeHandleCRn                 call s:HandleCR()
     command! -nargs=0 VeetCodeSubmit                    call s:SubmitProblem()
     command! -nargs=0 VeetCodeOpenPromptInBrowser       call s:OpenPromptInBrowser()
+    command! -nargs=0 VeetCodeCloseProblem              call s:CloseProblem()
 
     vnoremap <silent> <buffer> <return> :VeetCodeHandleCRv<cr>
     nnoremap <silent> <buffer> <return> :VeetCodeHandleCRn<cr>
     nnoremap <silent> <leader>vs        :VeetCodeSubmit<cr>
     nnoremap <silent> <leader>vp        :VeetCodeOpenPromptInBrowser<cr>
-
+    nnoremap <silent> <leader>vc        :VeetCodeCloseProblem<cr>
 
 
     call s:SetupHighlighting()
@@ -280,4 +281,8 @@ function! s:OpenPromptInBrowser() abort
     let id = split(expand('%:h'), '/')[-1]
     let problem_dir = expand(g:veetcode_problem_directory.'/'.id.'/')
     execute "!google-chrome " . problem_dir . 'prompt.md'
+endfunction
+
+function! s:CloseProblem() abort
+    exec "windo bw"
 endfunction
