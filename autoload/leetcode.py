@@ -514,10 +514,21 @@ def submit_problem(id):
     with open(os.path.join(problem_dir, str(id), 'code.py'), 'rb') as f:
         code = f.read().decode('utf-8')
     resp = lc.submit_problem(id, slug, code)
-    return resp.json().get('status_msg')
+    data = resp.json()
+    status = data.get('status_msg')
+    if status == 'Wrong Answer':
+        return f"""{status}
+        {data.get('input_formatted')}
+        """
+    elif status == 'Runtime Error':
+        return f"""{status}
+        {data.get('full_runtime_error')}
+        """
+    return status
 
 
 
 if __name__ == "__main__":
     set_script_directory(".")
     set_problem_directory(problem_dir)
+
